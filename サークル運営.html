@@ -1,0 +1,539 @@
+import React, { useState } from 'react';
+import { 
+  Calendar as CalendarIcon, 
+  Users, 
+  MessageSquare, 
+  CheckSquare, 
+  ChevronLeft, 
+  ChevronRight, 
+  Plus, 
+  X, 
+  Upload, 
+  Trash2, 
+  Send 
+} from 'lucide-react';
+
+// サークルで定義された全15役職
+const ROLES = [
+  "委員長", "副委員長", "会計局長", "統合運用", "学友会担当", 
+  "多摩支部長", "総務部長", "事業部長", "管理・先端技術運用局長", 
+  "広報編集局長", "企画局長", "社会人渉外局長", "講演会局長", 
+  "政策連携局長", "研究局長"
+];
+
+export default function App() {
+  // ナビゲーション管理: 'home', 'projects', 'officers', 'chat', 'tasks'
+  const [currentPage, setCurrentPage] = useState('home');
+
+  // --- 状態管理 ---
+  // ① カレンダー・イベントデータ
+  const [currentDate, setCurrentDate] = useState(new Date(2026, 6, 1)); // 2026年7月初期値
+  const [events, setEvents] = useState([
+    { id: 1, name: '定期総会', date: '2026-07-15', location: '大講義室', role: '委員長' },
+    { id: 2, name: '夏合宿企画会議', date: '2026-07-20', location: '部室', role: '企画局長' }
+  ]);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [newEvent, setNewEvent] = useState({ name: '', date: '', location: '', role: ROLES[0] });
+  const [selectedEvent, setSelectedEvent] = useState(null);
+
+  // ② 役員図データ（画像データURL）
+  const [officerImage, setOfficerImage] = useState(null);
+
+  // ③ チャットデータ
+  const [chatType, setChatType] = useState('group'); // 'group' or 'dm'
+  const [userName, setUserName] = useState('');
+  const [dmTarget, setDmTarget] = useState(ROLES[0]);
+  const [messages, setMessages] = useState([
+    { id: 1, type: 'group', sender: '田中（委員長）', text: '次回の会議は15日です！' },
+    { id: 2, type: 'dm', target: '副委員長', text: '議題の準備をお願いできますか？' }
+  ]);
+  const [inputMessage, setInputMessage] = useState('');
+
+  // ④ タスクデータ
+  const [tasks, setTasks] = useState([
+    { id: 1, content: '総会資料の作成', role: '総務部長' }
+  ]);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [newTask, setNewTask] = useState({ content: '', role: ROLES[0] });
+
+  // --- イベントハンドラー ---
+  // イベント追加
+  const handleAddEvent = (e) => {
+    e.preventDefault();
+    if (!newEvent.name || !newEvent.date) return;
+    setEvents([...events, { ...newEvent, id: Date.now() }]);
+    setNewEvent({ name: '', date: '', location: '', role: ROLES[0] });
+    setIsEventModalOpen(false);
+  };
+
+  // 役員図画像アップロード
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setOfficerImage(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // チャット送信
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (!inputMessage.trim()) return;
+    if (chatType === 'group' && !userName.trim()) {
+      alert('全員チャットでは名前を入力してください。');
+      return;
+    }
+
+    const msg = {
+      id: Date.now(),
+      type: chatType,
+      sender: chatType === 'group' ? userName : '自分',
+      target: chatType === 'dm' ? dmTarget : null,
+      text: inputMessage
+    };
+
+    setMessages([...messages, msg]);
+    setInputMessage('');
+  };
+
+  // タスク追加
+  const handleAddTask = (e) => {
+    e.preventDefault();
+    if (!newTask.content) return;
+    setTasks([...tasks, { ...newTask, id: Date.now() }]);
+    setNewTask({ content: '', role: ROLES[0] });
+    setIsTaskModalOpen(false);
+  };
+
+  // --- 描画ロジック：カレンダー ---
+  const renderCalendar = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const days = [];
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="h-24 bg-gray-50 border border-gray-200"></div>);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayEvents = events.filter(e => e.date === dateStr);
+
+      days.push(
+        <div key={day} className="h-24 border border-gray-200 p-1 overflow-y-auto bg-white hover:bg-slate-50 transition">
+          <div className="font-bold text-sm text-gray-700 mb-1">{day}</div>
+          {dayEvents.map(evt => (
+            <div
+              key={evt.id}
+              onClick={() => setSelectedEvent(evt)}
+              className="text-xs bg-blue-100 text-blue-800 p-1 rounded mb-1 cursor-pointer truncate font-medium hover:bg-blue-200"
+            >
+              {evt.name}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+              className="p-2 border rounded-full hover:bg-gray-100"
+            >
+              <ChevronLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <h2 className="text-xl font-bold text-gray-800">
+              {year}年 {month + 1}月
+            </h2>
+            <button
+              onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
+              className="p-2 border rounded-full hover:bg-gray-100"
+            >
+              <ChevronRight className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+          <button
+            onClick={() => setIsEventModalOpen(true)}
+            className="flex items-center space-x-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus className="w-4 h-4" />
+            <span>イベント追加</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-7 gap-px bg-gray-200 text-center font-bold text-sm text-gray-600 mb-1">
+          <div className="py-2 bg-white text-red-500">日</div>
+          <div className="py-2 bg-white">月</div>
+          <div className="py-2 bg-white">火</div>
+          <div className="py-2 bg-white">水</div>
+          <div className="py-2 bg-white">木</div>
+          <div className="py-2 bg-white">金</div>
+          <div className="py-2 bg-white text-blue-500">土</div>
+        </div>
+        <div className="grid grid-cols-7 gap-px bg-gray-200">{days}</div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-gray-800">
+      {/* 共通ヘッダー（ホーム以外で表示） */}
+      {currentPage !== 'home' && (
+        <header className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm">
+          <h1 
+            onClick={() => setCurrentPage('home')}
+            className="text-2xl font-black text-blue-700 cursor-pointer hover:opacity-80 transition"
+          >
+            政治学会
+          </h1>
+          <button 
+            onClick={() => setCurrentPage('home')} 
+            className="text-sm font-semibold text-blue-600 hover:underline"
+          >
+            ← ホームに戻る
+          </button>
+        </header>
+      )}
+
+      {/* メインコンテンツ切り替え */}
+      <main className="max-w-5xl mx-auto p-6">
+        {/* ① ホーム画面 */}
+        {currentPage === 'home' && (
+          <div className="flex flex-col items-center justify-center min-h-[80vh]">
+            <h1 className="text-6xl font-black text-gray-900 tracking-wider mb-16 border-b-4 border-blue-600 pb-4">
+              政治学会
+            </h1>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl">
+              <button
+                onClick={() => setCurrentPage('projects')}
+                className="flex items-center justify-center space-x-3 bg-blue-600 hover:bg-blue-700 text-white p-6 rounded-xl shadow-lg transition transform hover:-translate-y-1"
+              >
+                <CalendarIcon className="w-6 h-6" />
+                <span className="text-xl font-bold">進行中の企画</span>
+              </button>
+              <button
+                onClick={() => setCurrentPage('officers')}
+                className="flex items-center justify-center space-x-3 bg-blue-600 hover:bg-blue-700 text-white p-6 rounded-xl shadow-lg transition transform hover:-translate-y-1"
+              >
+                <Users className="w-6 h-6" />
+                <span className="text-xl font-bold">役員図</span>
+              </button>
+              <button
+                onClick={() => setCurrentPage('chat')}
+                className="flex items-center justify-center space-x-3 bg-blue-600 hover:bg-blue-700 text-white p-6 rounded-xl shadow-lg transition transform hover:-translate-y-1"
+              >
+                <MessageSquare className="w-6 h-6" />
+                <span className="text-xl font-bold">チャット</span>
+              </button>
+              <button
+                onClick={() => setCurrentPage('tasks')}
+                className="flex items-center justify-center space-x-3 bg-blue-600 hover:bg-blue-700 text-white p-6 rounded-xl shadow-lg transition transform hover:-translate-y-1"
+              >
+                <CheckSquare className="w-6 h-6" />
+                <span className="text-xl font-bold">タスク管理</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ② 進行中の企画（カレンダー） */}
+        {currentPage === 'projects' && renderCalendar()}
+
+        {/* ③ 役員図 */}
+        {currentPage === 'officers' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">役員組織図</h2>
+            {officerImage ? (
+              <div className="flex flex-col items-center">
+                <img src={officerImage} alt="役員図" className="max-w-full h-auto rounded border mb-4" />
+                <button
+                  onClick={() => setOfficerImage(null)}
+                  className="flex items-center space-x-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>画像を削除</span>
+                </button>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-4">PC内から役員図の画像ファイルをアップロードしてください</p>
+                <label className="bg-blue-600 text-white px-6 py-2 rounded-lg cursor-pointer hover:bg-blue-700 transition inline-block">
+                  画像を選択
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ④ チャット */}
+        {currentPage === 'chat' && (
+          <div className="bg-white rounded-lg shadow flex flex-col h-[650px]">
+            {/* モード切替タブ */}
+            <div className="flex border-b">
+              <button
+                onClick={() => setChatType('group')}
+                className={`flex-1 py-4 font-bold text-center border-b-2 ${
+                  chatType === 'group' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-gray-500'
+                }`}
+              >
+                全員チャット
+              </button>
+              <button
+                onClick={() => setChatType('dm')}
+                className={`flex-1 py-4 font-bold text-center border-b-2 ${
+                  chatType === 'dm' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-gray-500'
+                }`}
+              >
+                個人チャット (DM)
+              </button>
+            </div>
+
+            {/* チャットメッセージ表示エリア */}
+            <div className="flex-1 p-6 overflow-y-auto space-y-4">
+              {messages
+                .filter(m => m.type === chatType && (chatType === 'group' || m.target === dmTarget || m.sender === '自分'))
+                .map(m => (
+                  <div key={m.id} className={`flex flex-col ${m.sender === '自分' ? 'items-end' : 'items-start'}`}>
+                    <span className="text-xs text-gray-500 mb-1">{m.sender} {m.target && `→ ${m.target}`}</span>
+                    <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${
+                      m.sender === '自分' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            {/* チャット入力エリア */}
+            <form onSubmit={handleSendMessage} className="p-4 border-t bg-gray-50 space-y-3">
+              {chatType === 'group' ? (
+                <div>
+                  <input
+                    type="text"
+                    placeholder="あなたの名前を入力"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    className="w-full sm:w-1/3 p-2 border rounded text-sm mb-2"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold text-gray-600">送信先役職:</span>
+                  <select
+                    value={dmTarget}
+                    onChange={(e) => setDmTarget(e.target.value)}
+                    className="p-2 border rounded text-sm"
+                  >
+                    {ROLES.map(role => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  placeholder="メッセージを入力..."
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  className="flex-1 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition flex items-center space-x-1"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>送信</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ⑤ タスク管理 */}
+        {currentPage === 'tasks' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">役職別タスク管理</h2>
+              <button
+                onClick={() => setIsTaskModalOpen(true)}
+                className="flex items-center space-x-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>タスク追加</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {ROLES.map(role => {
+                // カレンダーから自動抽出されたイベントタスク
+                const roleEvents = events.filter(e => e.role === role);
+                // 手動追加された個別タスク
+                const roleTasks = tasks.filter(t => t.role === role);
+
+                return (
+                  <div key={role} className="border rounded-lg p-4 bg-slate-50">
+                    <h3 className="font-bold text-lg text-blue-900 border-b pb-2 mb-3">{role}</h3>
+                    
+                    {/* カレンダー連動項目 */}
+                    {roleEvents.length > 0 && (
+                      <div className="mb-3">
+                        <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-0.5 rounded">企画関連イベント</span>
+                        <ul className="mt-1 space-y-1">
+                          {roleEvents.map(e => (
+                            <li key={e.id} className="text-sm bg-white p-2 rounded border text-gray-700">
+                              📅 {e.name} （{e.date} @ {e.location}）
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* 個別タスク項目 */}
+                    {roleTasks.length > 0 && (
+                      <div>
+                        <span className="text-xs font-semibold text-gray-600 bg-gray-200 px-2 py-0.5 rounded">割当タスク</span>
+                        <ul className="mt-1 space-y-1">
+                          {roleTasks.map(t => (
+                            <li key={t.id} className="text-sm bg-white p-2 rounded border text-gray-700">
+                              ☑ {t.content}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {roleEvents.length === 0 && roleTasks.length === 0 && (
+                      <p className="text-xs text-gray-400 italic">割り振られたタスクはありません</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* --- モーダルダイアログ群 --- */}
+      {/* イベント追加モーダル */}
+      {isEventModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">イベント追加</h3>
+              <button onClick={() => setIsEventModalOpen(false)}><X className="w-5 h-5 text-gray-500" /></button>
+            </div>
+            <form onSubmit={handleAddEvent} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">イベント名</label>
+                <input
+                  type="text"
+                  required
+                  value={newEvent.name}
+                  onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">開催日時</label>
+                <input
+                  type="date"
+                  required
+                  value={newEvent.date}
+                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">場所</label>
+                <input
+                  type="text"
+                  required
+                  value={newEvent.location}
+                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">担当する役職</label>
+                <select
+                  value={newEvent.role}
+                  onChange={(e) => setNewEvent({ ...newEvent, role: e.target.value })}
+                  className="w-full p-2 border rounded"
+                >
+                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold hover:bg-blue-700">
+                完了
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* イベント詳細モーダル */}
+      {selectedEvent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-sm w-full p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-blue-900">{selectedEvent.name}</h3>
+              <button onClick={() => setSelectedEvent(null)}><X className="w-5 h-5 text-gray-500" /></button>
+            </div>
+            <div className="space-y-2 text-sm text-gray-700">
+              <p><strong>日付:</strong> {selectedEvent.date}</p>
+              <p><strong>場所:</strong> {selectedEvent.location}</p>
+              <p><strong>担当役職:</strong> {selectedEvent.role}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* タスク追加モーダル */}
+      {isTaskModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">タスク追加</h3>
+              <button onClick={() => setIsTaskModalOpen(false)}><X className="w-5 h-5 text-gray-500" /></button>
+            </div>
+            <form onSubmit={handleAddTask} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">タスクの内容</label>
+                <input
+                  type="text"
+                  required
+                  value={newTask.content}
+                  onChange={(e) => setNewTask({ ...newTask, content: e.target.value })}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">割り当てる役職</label>
+                <select
+                  value={newTask.role}
+                  onChange={(e) => setNewTask({ ...newTask, role: e.target.value })}
+                  className="w-full p-2 border rounded"
+                >
+                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold hover:bg-blue-700">
+                完了
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
